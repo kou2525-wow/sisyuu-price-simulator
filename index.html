@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>刺繍シミュレーター</title>
+  <meta name="description" content="刺繍の料金を簡単にシミュレーション。デザインの種類・配置場所・サイズ・数量を選ぶだけで概算見積もりを即時表示。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ============================================================
+       Design Tokens
+       ============================================================ */
+    :root {
+      --c-primary: #2563eb;
+      --c-primary-light: #3b82f6;
+      --c-primary-bg: #eff6ff;
+      --c-primary-ring: rgba(37, 99, 235, .25);
+      --c-bg: #f8fafc;
+      --c-surface: #ffffff;
+      --c-border: #e2e8f0;
+      --c-text: #1e293b;
+      --c-text-secondary: #64748b;
+      --c-text-muted: #94a3b8;
+      --c-success: #16a34a;
+      --c-danger: #ef4444;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --radius-xs: 6px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,.06);
+      --shadow-md: 0 4px 16px rgba(0,0,0,.08);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,.10);
+      --transition: .22s cubic-bezier(.4,0,.2,1);
+      --font: 'Noto Sans JP', system-ui, sans-serif;
+    }
+
+    /* ============================================================
+       Reset & Base
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: var(--font);
+      background: var(--c-bg);
+      color: var(--c-text);
+      line-height: 1.7;
+      min-height: 100dvh;
+      padding-bottom: 120px; /* 下部バー分 */
+    }
+
+    /* ============================================================
+       Header
+       ============================================================ */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--c-surface);
+      border-bottom: 1px solid var(--c-border);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      backdrop-filter: blur(12px);
+    }
+    .header h1 {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: .02em;
+    }
+    .header-icon {
+      width: 22px;
+      height: 22px;
+      color: var(--c-primary);
+    }
+
+    /* ============================================================
+       Progress Indicator
+       ============================================================ */
+    .progress-bar {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      padding: 16px 20px 8px;
+    }
+    .progress-dot {
+      width: 32px;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--c-border);
+      transition: background var(--transition);
+    }
+    .progress-dot.active {
+      background: var(--c-primary);
+    }
+    .progress-dot.completed {
+      background: var(--c-primary-light);
+    }
+
+    /* ============================================================
+       Container & Section
+       ============================================================ */
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+    .section {
+      margin-top: 24px;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .step-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--c-primary);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .step-number.completed {
+      background: var(--c-success);
+    }
+    .section-title h2 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .section-badge {
+      font-size: 12px;
+      font-weight: 500;
+      padding: 2px 10px;
+      border-radius: 20px;
+      background: var(--c-primary-bg);
+      color: var(--c-primary);
+    }
+
+    /* ============================================================
+       Step 1: Design Type Cards
+       ============================================================ */
+    .card-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .design-card {
+      position: relative;
+      border: 2px solid var(--c-border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+      background: var(--c-surface);
+    }
+    .design-card:hover {
+      border-color: var(--c-primary-light);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    .design-card.selected {
+      border-color: var(--c-primary);
+      box-shadow: 0 0 0 3px var(--c-primary-ring);
+    }
+    .design-card .check-badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--c-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transform: scale(.6);
+      transition: all var(--transition);
+    }
+    .design-card.selected .check-badge {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .design-card img {
+      width: 100%;
+      aspect-ratio: 4/3;
+      object-fit: cover;
+      display: block;
+    }
+    .design-card .card-label {
+      padding: 10px 12px;
+    }
+    .design-card .card-label .card-name {
+      font-size: 14px;
+      font-weight: 600;
+      display: block;
+    }
+    .design-card .card-label .card-desc {
+      font-size: 11px;
+      color: var(--c-text-secondary);
+      margin-top: 2px;
+      display: block;
+      line-height: 1.4;
+    }
+
+    /* ============================================================
+       Step 2: Placement Map
+       ============================================================ */
+    .placement-wrapper {
+      background: var(--c-surface);
+      border: 1px solid var(--c-border);
+      border-radius: var(--radius);
+      padding: 24px 16px 16px;
+      text-align: center;
+    }
+    .placement-map {
+      position: relative;
+      width: 220px;
+      height: 260px;
+      margin: 0 auto 12px;
+    }
+    .shirt-silhouette {
+      width: 100%;
+      height: 100%;
+      color: var(--c-border);
+    }
+    .placement-dot {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(37,99,235,.08);
+      border: 2px solid var(--c-primary-light);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition);
+    }
+    .placement-dot:hover {
+      background: rgba(37,99,235,.15);
+      transform: scale(1.1);
+    }
+    .placement-dot.selected {
+      background: var(--c-primary);
+      border-color: var(--c-primary);
+    }
+    .placement-dot .dot-inner {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--c-primary-light);
+      transition: background var(--transition);
+    }
+    .placement-dot.selected .dot-inner {
+      background: #fff;
+    }
+    .placement-dot-label {
+      position: absolute;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--c-text-secondary);
+      white-space: nowrap;
+    }
+    /* 配置場所の位置 */
+    .dot-left-chest { left: 52%; top: 38%; }
+    .dot-right-sleeve { left: 14%; top: 32%; }
+    .dot-center { left: 38%; top: 52%; }
+    .label-left-chest { left: 74%; top: 40%; }
+    .label-right-sleeve { left: 2%; top: 22%; }
+    .label-center { left: 28%; top: 70%; }
+
+    .placement-hint {
+      font-size: 12px;
+      color: var(--c-text-muted);
+      margin-top: 4px;
+    }
+
+    /* ============================================================
+       Step 3: Size Selection
+       ============================================================ */
+    .size-options {
+      display: flex;
+      gap: 8px;
+    }
+    .size-card {
+      flex: 1;
+      padding: 16px 8px;
+      border: 2px solid var(--c-border);
+      border-radius: var(--radius-sm);
+      text-align: center;
+      cursor: pointer;
+      background: var(--c-surface);
+      transition: all var(--transition);
+    }
+    .size-card:hover {
+      border-color: var(--c-primary-light);
+      transform: translateY(-1px);
+    }
+    .size-card.selected {
+      border-color: var(--c-primary);
+      background: var(--c-primary-bg);
+      box-shadow: 0 0 0 3px var(--c-primary-ring);
+    }
+    .size-card .size-label {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--c-primary);
+    }
+    .size-card .size-area {
+      font-size: 12px;
+      color: var(--c-text-secondary);
+      margin-top: 4px;
+    }
+    .size-card .size-example {
+      font-size: 11px;
+      color: var(--c-text-muted);
+      margin-top: 2px;
+    }
+
+    /* ============================================================
+       Step 4: Quantity
+       ============================================================ */
+    .quantity-wrapper {
+      background: var(--c-surface);
+      border: 1px solid var(--c-border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+    .quantity-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .quantity-label-group .qty-main {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .quantity-label-group .qty-sub {
+      font-size: 12px;
+      color: var(--c-text-muted);
+      margin-top: 1px;
+    }
+    .quantity-controls {
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+    .qty-btn {
+      width: 42px;
+      height: 42px;
+      border: 2px solid var(--c-border);
+      background: var(--c-surface);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition);
+      color: var(--c-text);
+    }
+    .qty-btn:hover {
+      border-color: var(--c-primary-light);
+      color: var(--c-primary);
+    }
+    .qty-btn:active {
+      background: var(--c-primary-bg);
+    }
+    .qty-btn.minus {
+      border-radius: var(--radius-xs) 0 0 var(--radius-xs);
+      border-right: none;
+    }
+    .qty-btn.plus {
+      border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+      border-left: none;
+      background: var(--c-primary);
+      border-color: var(--c-primary);
+      color: #fff;
+    }
+    .qty-btn.plus:hover {
+      background: var(--c-primary-light);
+      border-color: var(--c-primary-light);
+      color: #fff;
+    }
+    .qty-input {
+      width: 56px;
+      height: 42px;
+      border: 2px solid var(--c-border);
+      border-left: none;
+      border-right: none;
+      text-align: center;
+      font-size: 17px;
+      font-weight: 600;
+      font-family: var(--font);
+      color: var(--c-text);
+      outline: none;
+      -moz-appearance: textfield;
+    }
+    .qty-input::-webkit-inner-spin-button,
+    .qty-input::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+    }
+    .qty-input:focus {
+      border-color: var(--c-primary);
+    }
+
+    /* Discount Tiers */
+    .discount-tiers {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--c-border);
+    }
+    .tier {
+      flex: 1;
+      text-align: center;
+      padding: 8px 4px;
+      border-radius: var(--radius-xs);
+      font-size: 12px;
+      color: var(--c-text-muted);
+      background: var(--c-bg);
+      transition: all var(--transition);
+      cursor: default;
+    }
+    .tier.active {
+      background: var(--c-primary-bg);
+      color: var(--c-primary);
+      font-weight: 600;
+    }
+
+    /* ============================================================
+       Options Section (Color, First-time fee toggle)
+       ============================================================ */
+    .options-section {
+      margin-top: 24px;
+    }
+    .option-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--c-surface);
+      border: 1px solid var(--c-border);
+      border-radius: var(--radius-sm);
+      padding: 16px 20px;
+      margin-bottom: 8px;
+    }
+    .option-info .option-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .option-info .option-desc {
+      font-size: 12px;
+      color: var(--c-text-muted);
+    }
+    /* Color count stepper */
+    .color-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .color-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1.5px solid var(--c-border);
+      background: var(--c-surface);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition);
+      color: var(--c-text-secondary);
+    }
+    .color-btn:hover {
+      border-color: var(--c-primary);
+      color: var(--c-primary);
+    }
+    .color-count {
+      font-size: 16px;
+      font-weight: 600;
+      min-width: 24px;
+      text-align: center;
+    }
+
+    /* Toggle switch */
+    .toggle-switch {
+      position: relative;
+      width: 48px;
+      height: 28px;
+      cursor: pointer;
+    }
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      border-radius: 28px;
+      background: var(--c-border);
+      transition: background var(--transition);
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      left: 3px;
+      top: 3px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: var(--shadow-sm);
+      transition: transform var(--transition);
+    }
+    .toggle-switch input:checked + .toggle-slider {
+      background: var(--c-primary);
+    }
+    .toggle-switch input:checked + .toggle-slider::before {
+      transform: translateX(20px);
+    }
+
+    /* ============================================================
+       Bottom Bar (Fixed)
+       ============================================================ */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 200;
+      background: var(--c-surface);
+      border-top: 1px solid var(--c-border);
+      box-shadow: 0 -4px 20px rgba(0,0,0,.06);
+      padding: 16px 20px;
+      padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    }
+    .bottom-content {
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    .price-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .price-label {
+      font-size: 13px;
+      color: var(--c-text-secondary);
+    }
+    .price-value {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -.02em;
+      color: var(--c-text);
+      transition: color var(--transition);
+    }
+    .price-yen {
+      font-size: 18px;
+      font-weight: 600;
+      margin-right: 2px;
+    }
+    .order-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 15px 24px;
+      background: var(--c-primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 15px;
+      font-weight: 600;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .order-btn:hover {
+      background: var(--c-primary-light);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+    }
+    .order-btn:active {
+      transform: translateY(0);
+    }
+    .order-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    /* ============================================================
+       Price Breakdown (Expandable)
+       ============================================================ */
+    .breakdown-toggle {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--c-primary);
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-family: var(--font);
+      font-weight: 500;
+      padding: 0;
+      margin-bottom: 8px;
+    }
+    .breakdown-toggle svg {
+      width: 14px;
+      height: 14px;
+      transition: transform var(--transition);
+    }
+    .breakdown-toggle.open svg {
+      transform: rotate(180deg);
+    }
+    .breakdown-details {
+      display: none;
+      background: var(--c-bg);
+      border-radius: var(--radius-xs);
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+    .breakdown-details.show {
+      display: block;
+      animation: slideDown .2s ease-out;
+    }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .breakdown-line {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      color: var(--c-text-secondary);
+    }
+    .breakdown-line.total {
+      border-top: 1px solid var(--c-border);
+      margin-top: 6px;
+      padding-top: 8px;
+      font-weight: 600;
+      color: var(--c-text);
+    }
+
+    /* ============================================================
+       Animations & Utilities
+       ============================================================ */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .section {
+      animation: fadeInUp .4s ease-out backwards;
+    }
+    .section:nth-child(2) { animation-delay: .05s; }
+    .section:nth-child(3) { animation-delay: .1s; }
+    .section:nth-child(4) { animation-delay: .15s; }
+    .section:nth-child(5) { animation-delay: .2s; }
+    .section:nth-child(6) { animation-delay: .25s; }
+
+    /* Responsive */
+    @media (max-width: 380px) {
+      .container { padding: 0 12px; }
+      .price-value { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========== Header ========== -->
+  <header class="header">
+    <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <!-- needle & thread icon -->
+      <path d="M12 2L12 10"/>
+      <path d="M12 10C12 10 8 14 8 17C8 19.2 9.8 21 12 21C14.2 21 16 19.2 16 17C16 14 12 10 12 10Z"/>
+      <path d="M9.5 6.5C7 7.5 4 10 4 10"/>
+      <path d="M14.5 6.5C17 7.5 20 10 20 10"/>
+    </svg>
+    <h1>刺繍シミュレーター</h1>
+  </header>
+
+  <!-- ========== Progress ========== -->
+  <div class="progress-bar" id="progressBar">
+    <div class="progress-dot active" data-step="1"></div>
+    <div class="progress-dot" data-step="2"></div>
+    <div class="progress-dot" data-step="3"></div>
+    <div class="progress-dot" data-step="4"></div>
+  </div>
+
+  <div class="container">
+
+    <!-- ========== Step 1: デザインの種類 ========== -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">
+          <span class="step-number" id="step1badge">1</span>
+          <h2>デザインの種類</h2>
+        </div>
+        <span class="section-badge">必須</span>
+      </div>
+      <div class="card-grid" id="designGrid">
+        <div class="design-card selected" data-type="standard" onclick="selectDesign(this)">
+          <div class="check-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <img src="img_standard.png" alt="スタンダード刺繍" loading="lazy">
+          <div class="card-label">
+            <span class="card-name">スタンダード</span>
+            <span class="card-desc">一般的な平面刺繍。耐久性が高く美しい仕上がり。</span>
+          </div>
+        </div>
+        <div class="design-card" data-type="3d" onclick="selectDesign(this)">
+          <div class="check-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <img src="img_3d.png" alt="3D刺繍" loading="lazy">
+          <div class="card-label">
+            <span class="card-name">3D刺繍</span>
+            <span class="card-desc">ウレタン入りで立体感のある迫力の仕上がり。</span>
+          </div>
+        </div>
+        <div class="design-card" data-type="wappen" onclick="selectDesign(this)">
+          <div class="check-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <img src="img_wappen.png" alt="ワッペン" loading="lazy">
+          <div class="card-label">
+            <span class="card-name">ワッペン</span>
+            <span class="card-desc">取り外し可能。縫付・ベルクロ対応。</span>
+          </div>
+        </div>
+        <div class="design-card" data-type="name" onclick="selectDesign(this)">
+          <div class="check-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <img src="img_name.png" alt="ネーム刺繍" loading="lazy">
+          <div class="card-label">
+            <span class="card-name">ネーム刺繍</span>
+            <span class="card-desc">既成書体で名前を刺繍。型代不要。</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== Step 2: 配置場所 ========== -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">
+          <span class="step-number" id="step2badge">2</span>
+          <h2>配置場所</h2>
+        </div>
+        <span class="section-badge">選択</span>
+      </div>
+      <div class="placement-wrapper">
+        <div class="placement-map">
+          <!-- Shirt SVG silhouette -->
+          <svg class="shirt-silhouette" viewBox="0 0 220 260" fill="none">
+            <path d="M60 20 L30 40 L10 90 L40 100 L45 60 L45 240 L175 240 L175 60 L180 100 L210 90 L190 40 L160 20 L140 35 Q110 55 80 35 Z"
+                  fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5" stroke-linejoin="round"/>
+            <!-- collar -->
+            <path d="M80 35 Q95 28 110 32 Q125 28 140 35"
+                  fill="none" stroke="#cbd5e1" stroke-width="1.5"/>
+          </svg>
+
+          <!-- Dots -->
+          <div class="placement-dot dot-left-chest selected" data-placement="left-chest" onclick="selectPlacement(this)">
+            <span class="dot-inner"></span>
+          </div>
+          <span class="placement-dot-label label-left-chest">左胸</span>
+
+          <div class="placement-dot dot-right-sleeve" data-placement="right-sleeve" onclick="selectPlacement(this)">
+            <span class="dot-inner"></span>
+          </div>
+          <span class="placement-dot-label label-right-sleeve">右袖</span>
+
+          <div class="placement-dot dot-center" data-placement="center" onclick="selectPlacement(this)">
+            <span class="dot-inner"></span>
+          </div>
+          <span class="placement-dot-label label-center">胸中央</span>
+        </div>
+        <p class="placement-hint">タップして刺繍位置を選択してください</p>
+      </div>
+    </div>
+
+    <!-- ========== Step 3: サイズ ========== -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">
+          <span class="step-number" id="step3badge">3</span>
+          <h2>サイズ</h2>
+        </div>
+        <span class="section-badge">選択</span>
+      </div>
+      <div class="size-options" id="sizeOptions">
+        <div class="size-card selected" data-size="S" onclick="selectSize(this)">
+          <div class="size-label">S</div>
+          <div class="size-area">~25cm&sup2;</div>
+          <div class="size-example">胸・袖</div>
+        </div>
+        <div class="size-card" data-size="M" onclick="selectSize(this)">
+          <div class="size-label">M</div>
+          <div class="size-area">~50cm&sup2;</div>
+          <div class="size-example">背中小</div>
+        </div>
+        <div class="size-card" data-size="L" onclick="selectSize(this)">
+          <div class="size-label">L</div>
+          <div class="size-area">~100cm&sup2;</div>
+          <div class="size-example">背中大</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== Step 4: 数量 ========== -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">
+          <span class="step-number" id="step4badge">4</span>
+          <h2>数量</h2>
+        </div>
+      </div>
+      <div class="quantity-wrapper">
+        <div class="quantity-row">
+          <div class="quantity-label-group">
+            <div class="qty-main">注文枚数</div>
+            <div class="qty-sub">10枚以上で割引適用</div>
+          </div>
+          <div class="quantity-controls">
+            <button class="qty-btn minus" onclick="changeQty(-1)" aria-label="減らす">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <input type="number" class="qty-input" id="qtyInput" value="1" min="1" max="999" onchange="onQtyChange()">
+            <button class="qty-btn plus" onclick="changeQty(1)" aria-label="増やす">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="discount-tiers" id="discountTiers">
+          <div class="tier active" data-min="1">1枚</div>
+          <div class="tier" data-min="10">10枚 (5%OFF)</div>
+          <div class="tier" data-min="50">50枚 (10%OFF)</div>
+          <div class="tier" data-min="100">100枚 (15%OFF)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== Options ========== -->
+    <div class="section options-section">
+      <div class="option-row">
+        <div class="option-info">
+          <div class="option-title">糸色数</div>
+          <div class="option-desc">4色目から +50円/枚</div>
+        </div>
+        <div class="color-controls">
+          <button class="color-btn" onclick="changeColor(-1)" aria-label="色数を減らす">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <span class="color-count" id="colorCount">3</span>
+          <button class="color-btn" onclick="changeColor(1)" aria-label="色数を増やす">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="option-row" id="moldFeeRow">
+        <div class="option-info">
+          <div class="option-title">型代（初回費）</div>
+          <!-- NOTE: ネーム刺繍の場合は型代不要と表示される -->
+          <div class="option-desc" id="moldFeeDesc">初回のみ ¥5,500</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="moldFeeToggle" checked onchange="updatePrice()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+  </div><!-- /.container -->
+
+  <!-- ========== Bottom Bar ========== -->
+  <div class="bottom-bar">
+    <div class="bottom-content">
+      <div class="price-row">
+        <span class="price-label">概算見積 (税込)</span>
+        <div>
+          <span class="price-yen">&yen;</span><span class="price-value" id="totalPrice">6,105</span>
+        </div>
+      </div>
+      <button class="breakdown-toggle" id="breakdownToggle" onclick="toggleBreakdown()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        内訳を見る
+      </button>
+      <div class="breakdown-details" id="breakdownDetails">
+        <div class="breakdown-line"><span>加工代</span><span id="bdProcessing">¥605</span></div>
+        <div class="breakdown-line"><span>x 数量</span><span id="bdQty">x 1</span></div>
+        <div class="breakdown-line"><span>色数追加</span><span id="bdColor">¥0</span></div>
+        <div class="breakdown-line"><span>型代（初回）</span><span id="bdMold">¥5,500</span></div>
+        <div class="breakdown-line total"><span>合計</span><span id="bdTotal">¥6,105</span></div>
+      </div>
+      <button class="order-btn" onclick="handleOrder()">
+        ご注文へ進む
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <script>
+    /* ============================================================
+       State
+       ============================================================ */
+    const state = {
+      designType: 'standard',
+      placement: 'left-chest',
+      size: 'S',
+      quantity: 1,
+      colorCount: 3,
+      includeMoldFee: true,
+    };
+
+    /* ============================================================
+       Price Table (レポート中央値ベース、税込)
+       NOTE: 3D刺繍の料金はレポートに明示なし → スタンダードの1.5倍で仮定
+       ============================================================ */
+    // NOTE: ベース単価はロゴ刺繍（小〜25cm²）のレポート中央値を採用
+    const BASE_PRICES = {
+      standard: { 1: 605, 10: 604, 50: 579, 100: 550 },
+      '3d':     { 1: 908, 10: 906, 50: 869, 100: 825 }, // x1.5
+      wappen:   { 1: 750, 10: 670, 50: 560, 100: 500 },
+      name:     { 1: 525, 10: 500, 50: 350, 100: 308 },
+    };
+
+    const SIZE_MULTIPLIER = { S: 1.0, M: 1.5, L: 2.5 };
+
+    // NOTE: 型代はレポート代表値 5,500円。ネーム刺繍は不要（0円）と仮定
+    const MOLD_FEES = {
+      standard: 5500,
+      '3d': 5500,
+      wappen: 6600,
+      name: 0,
+    };
+
+    const COLOR_EXTRA_PER_UNIT = 50; // 4色目以降 +50円/枚
+    const FREE_COLORS = 3;
+
+    /* ============================================================
+       Pricing Logic
+       ============================================================ */
+    function getBasePrice(type, qty) {
+      const table = BASE_PRICES[type];
+      if (qty >= 100) return table[100];
+      if (qty >= 50) return table[50];
+      if (qty >= 10) return table[10];
+      return table[1];
+    }
+
+    function getDiscountRate(qty) {
+      if (qty >= 100) return 0.15;
+      if (qty >= 50) return 0.10;
+      if (qty >= 10) return 0.05;
+      return 0;
+    }
+
+    function calcTotal() {
+      const { designType, size, quantity, colorCount, includeMoldFee } = state;
+
+      // base unit price
+      let unitPrice = getBasePrice(designType, quantity);
+
+      // size multiplier
+      unitPrice = Math.round(unitPrice * SIZE_MULTIPLIER[size]);
+
+      // color surcharge
+      const extraColors = Math.max(0, colorCount - FREE_COLORS);
+      const colorSurcharge = extraColors * COLOR_EXTRA_PER_UNIT;
+
+      // subtotal per unit
+      const unitTotal = unitPrice + colorSurcharge;
+
+      // processing total
+      const processingTotal = unitTotal * quantity;
+
+      // mold fee
+      const moldFee = includeMoldFee ? MOLD_FEES[designType] : 0;
+
+      return {
+        unitPrice,
+        colorSurcharge,
+        unitTotal,
+        processingTotal,
+        moldFee,
+        total: processingTotal + moldFee,
+      };
+    }
+
+    /* ============================================================
+       UI Update
+       ============================================================ */
+    function updatePrice() {
+      readStateFromUI();
+      const calc = calcTotal();
+
+      // Main price
+      document.getElementById('totalPrice').textContent = calc.total.toLocaleString();
+
+      // Breakdown
+      document.getElementById('bdProcessing').textContent = '¥' + calc.unitPrice.toLocaleString() + '/枚';
+      document.getElementById('bdQty').textContent = 'x ' + state.quantity;
+      document.getElementById('bdColor').textContent = '¥' + (calc.colorSurcharge * state.quantity).toLocaleString();
+      document.getElementById('bdMold').textContent = '¥' + calc.moldFee.toLocaleString();
+      document.getElementById('bdTotal').textContent = '¥' + calc.total.toLocaleString();
+
+      // Mold fee row description update
+      if (state.designType === 'name') {
+        document.getElementById('moldFeeDesc').textContent = 'ネーム刺繍は型代不要';
+        document.getElementById('moldFeeToggle').checked = false;
+        document.getElementById('moldFeeToggle').disabled = true;
+        state.includeMoldFee = false;
+      } else {
+        document.getElementById('moldFeeDesc').textContent = '初回のみ ¥' + MOLD_FEES[state.designType].toLocaleString();
+        document.getElementById('moldFeeToggle').disabled = false;
+      }
+
+      // Update discount tiers highlight
+      updateDiscountTiers();
+
+      // Update progress bar
+      updateProgress();
+    }
+
+    function readStateFromUI() {
+      state.quantity = parseInt(document.getElementById('qtyInput').value) || 1;
+      state.colorCount = parseInt(document.getElementById('colorCount').textContent) || 3;
+      state.includeMoldFee = document.getElementById('moldFeeToggle').checked;
+    }
+
+    function updateDiscountTiers() {
+      const tiers = document.querySelectorAll('.tier');
+      const qty = state.quantity;
+      tiers.forEach(t => {
+        const min = parseInt(t.dataset.min);
+        let isActive = false;
+        if (min === 1 && qty < 10) isActive = true;
+        else if (min === 10 && qty >= 10 && qty < 50) isActive = true;
+        else if (min === 50 && qty >= 50 && qty < 100) isActive = true;
+        else if (min === 100 && qty >= 100) isActive = true;
+        t.classList.toggle('active', isActive);
+      });
+    }
+
+    function updateProgress() {
+      const dots = document.querySelectorAll('.progress-dot');
+      // All steps considered filled once user interacts
+      dots.forEach((dot, i) => {
+        if (i < 4) {
+          dot.classList.add('active');
+        }
+      });
+    }
+
+    /* ============================================================
+       Interaction Handlers
+       ============================================================ */
+    function selectDesign(card) {
+      document.querySelectorAll('.design-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      state.designType = card.dataset.type;
+      document.getElementById('step1badge').classList.add('completed');
+      updatePrice();
+    }
+
+    function selectPlacement(dot) {
+      document.querySelectorAll('.placement-dot').forEach(d => d.classList.remove('selected'));
+      dot.classList.add('selected');
+      state.placement = dot.dataset.placement;
+      document.getElementById('step2badge').classList.add('completed');
+      updatePrice();
+    }
+
+    function selectSize(card) {
+      document.querySelectorAll('.size-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      state.size = card.dataset.size;
+      document.getElementById('step3badge').classList.add('completed');
+      updatePrice();
+    }
+
+    function changeQty(delta) {
+      const input = document.getElementById('qtyInput');
+      let val = parseInt(input.value) || 1;
+      val = Math.max(1, Math.min(999, val + delta));
+      input.value = val;
+      state.quantity = val;
+      document.getElementById('step4badge').classList.add('completed');
+      updatePrice();
+    }
+
+    function onQtyChange() {
+      const input = document.getElementById('qtyInput');
+      let val = parseInt(input.value) || 1;
+      val = Math.max(1, Math.min(999, val));
+      input.value = val;
+      state.quantity = val;
+      updatePrice();
+    }
+
+    function changeColor(delta) {
+      const el = document.getElementById('colorCount');
+      let val = parseInt(el.textContent) || 3;
+      val = Math.max(1, Math.min(12, val + delta));
+      el.textContent = val;
+      state.colorCount = val;
+      updatePrice();
+    }
+
+    function toggleBreakdown() {
+      const btn = document.getElementById('breakdownToggle');
+      const details = document.getElementById('breakdownDetails');
+      btn.classList.toggle('open');
+      details.classList.toggle('show');
+      btn.querySelector('svg').style.transform = details.classList.contains('show') ? 'rotate(180deg)' : '';
+    }
+
+    function handleOrder() {
+      const calc = calcTotal();
+      alert(
+        '【概算見積】\n' +
+        'デザイン: ' + getDesignLabel(state.designType) + '\n' +
+        '配置: ' + getPlacementLabel(state.placement) + '\n' +
+        'サイズ: ' + state.size + '\n' +
+        '数量: ' + state.quantity + '枚\n' +
+        '糸色数: ' + state.colorCount + '色\n' +
+        '合計: ¥' + calc.total.toLocaleString() + '(税込)\n\n' +
+        '※ 実際の料金はデザインの複雑さ等により変動します。'
+      );
+    }
+
+    function getDesignLabel(type) {
+      const labels = { standard: 'スタンダード', '3d': '3D刺繍', wappen: 'ワッペン', name: 'ネーム刺繍' };
+      return labels[type] || type;
+    }
+
+    function getPlacementLabel(p) {
+      const labels = { 'left-chest': '左胸', 'right-sleeve': '右袖', center: '胸中央' };
+      return labels[p] || p;
+    }
+
+    /* ============================================================
+       Init
+       ============================================================ */
+    updatePrice();
+  </script>
+</body>
+</html>
